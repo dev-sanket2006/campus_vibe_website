@@ -1,0 +1,137 @@
+generator client { 
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             Int             @id @default(autoincrement())
+  name           String
+  email          String          @unique
+  password       String
+  role           String          @default("student") // student | admin
+  createdAt      DateTime        @default(now())
+  dob            DateTime?       // Birthday
+  studentProfile StudentProfile?
+  adminProfile   AdminProfile?
+  messages       Message[]
+  groupMembers   GroupMember[]   // ✅ Groups the user is part of
+  sentRequests   FriendRequest[] @relation("SentRequests")
+  receivedRequests FriendRequest[] @relation("ReceivedRequests")
+  pollVotes      PollVote[]
+  events         Event[]         @relation("EventCreator")
+  confessions    Confession[]
+}
+
+model StudentProfile {
+  id        Int      @id @default(autoincrement())
+  year      Int
+  branch    String
+  section   String
+  userId    Int      @unique
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model AdminProfile {
+  id         Int    @id @default(autoincrement())
+  department String?
+  position   String?
+  userId     Int    @unique
+  user       User   @relation(fields: [userId], references: [id])
+}
+
+model Attendance {
+  id     Int      @id @default(autoincrement())
+  userId Int
+  user   User     @relation(fields: [userId], references: [id])
+  date   DateTime @default(now())
+  status String   // "attended" | "bunked"
+}
+
+model Poll {
+  id        Int       @id @default(autoincrement())
+  question  String
+  options   String[]
+  createdBy Int
+  votes     PollVote[]
+}
+
+model PollVote {
+  id      Int    @id @default(autoincrement())
+  userId  Int
+  pollId  Int
+  choice  String
+  user    User   @relation(fields: [userId], references: [id])
+  poll    Poll   @relation(fields: [pollId], references: [id])
+
+  @@unique([userId, pollId])
+}
+
+model Group {
+  id        Int           @id @default(autoincrement())
+  year      Int
+  branch    String
+  section   String
+  members   GroupMember[] // ✅ normalized many-to-many relation
+  messages  Message[]
+}
+
+model GroupMember {
+  id      Int   @id @default(autoincrement())
+  groupId Int
+  userId  Int
+
+  group   Group @relation(fields: [groupId], references: [id])
+  user    User  @relation(fields: [userId], references: [id])
+
+  @@unique([groupId, userId])
+}
+
+model Message {
+  id         Int      @id @default(autoincrement())
+  senderId   Int
+  groupId    Int
+  message    String
+  isAnonymous Boolean @default(false)
+  createdAt  DateTime @default(now())
+
+  sender User   @relation(fields: [senderId], references: [id])
+  group  Group  @relation(fields: [groupId], references: [id])
+}
+
+model FriendRequest {
+  id         Int      @id @default(autoincrement())
+  senderId   Int
+  receiverId Int
+  status     String   @default("pending") // pending | accepted | rejected
+  createdAt  DateTime @default(now())
+
+  sender   User @relation("SentRequests", fields: [senderId], references: [id])
+  receiver User @relation("ReceivedRequests", fields: [receiverId], references: [id])
+
+  @@unique([senderId, receiverId])
+}
+
+model Event {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String
+  date        DateTime
+  createdBy   Int
+  createdAt   DateTime @default(now())
+
+  creator User @relation("EventCreator", fields: [createdBy], references: [id])
+}
+
+model Confession {
+  id          Int      @id @default(autoincrement())
+  text        String
+  userId      Int
+  isAnonymous Boolean @default(true)
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
